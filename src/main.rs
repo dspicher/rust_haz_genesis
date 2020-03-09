@@ -12,16 +12,46 @@ pub fn rust_neoscrypt(message: [u8; 80], options: u32) -> [u8; 32] {
     return buf;
 }
 
+const LOWEST_BITS: &str = "1d7fffff";
+
+fn mine(
+    nVersion: u32,
+    hashPrevBlock: &str,
+    hashMerkleRoot: &str,
+    nTime: u32,
+    nBitsString: &str,
+    initialNonce: Option<u32>,
+) -> Option<u32> {
+    let lower = match initialNonce {
+        None => 0,
+        Some(i) => i,
+    };
+    for nNonce in lower..u32::max_value() {
+        println!("{:?}", nNonce);
+        if check_hash(
+            nVersion,
+            hashPrevBlock,
+            hashMerkleRoot,
+            nTime,
+            nBitsString,
+            nNonce,
+        ) {
+            return Some(nNonce);
+        }
+    }
+    None
+}
+
 fn check_hash(
     nVersion: u32,
-    hashPrevBlockString: &str,
-    hashMerkleRootString: &str,
+    hashPrevBlock: &str,
+    hashMerkleRoot: &str,
     nTime: u32,
     nBitsString: &str,
     nNonce: u32,
 ) -> bool {
-    let hashPrevBlock = hex::decode(hashPrevBlockString).unwrap();
-    let hashMerkleRoot = hex::decode(hashMerkleRootString).unwrap();
+    let hashPrevBlock = hex::decode(hashPrevBlock).unwrap();
+    let hashMerkleRoot = hex::decode(hashMerkleRoot).unwrap();
     let nBits = hex::decode(nBitsString).unwrap();
     let mut header = [0 as u8; 80];
     let mut idx = 0;
@@ -57,13 +87,18 @@ fn check_hash(
     let mut out = rust_neoscrypt(header, nNeoScryptOptions);
     out.reverse();
 
+    let target = get_target(nBits);
+
+    check_pow(out, target)
+}
+
+fn get_target(nBits: std::vec::Vec<u8>) -> [u8; 32] {
     let b = nBits[0] - 3;
     let mut target = [0 as u8; 32];
     target[32 - b as usize - 1] = nBits[3];
     target[32 - b as usize - 2] = nBits[2];
     target[32 - b as usize - 3] = nBits[1];
-
-    check_pow(out, target)
+    target
 }
 
 fn main() {}
@@ -101,4 +136,48 @@ fn test_real_blocks() {
         "1d023fa9",
         2041135619,
     ));
+}
+
+#[test]
+fn test_mine() {
+    // 277930
+    assert_eq!(
+        mine(
+            536870912,
+            "508ff5554dc9f83e3cab31b8fb89d10604ebcd963c7b8ce131fd3ef47c2a0921",
+            "a86996c4ae298b22a4a1c971aa29f0ea9fb1d822191fa8e0755b08381a90bc19",
+            1583516502,
+            "1d01cc13",
+            Some(867267585 - 10),
+        ),
+        Some(867267585),
+    );
+    // 277960
+    assert_eq!(
+        mine(
+            536870912,
+            "4cb8068ec9d224d5869fe57144cff796e4c88f9da5ebe81dab88cd247d93e0e2",
+            "3d976f66323f5d79880c8c87bcd35506f43e27c9ec75468572db57aacf7c1b72",
+            1583519758,
+            "1d023fa9",
+            Some(2041135619 - 10),
+        ),
+        Some(2041135619),
+    );
+}
+
+#[test]
+fn test_target() {
+    // from https://en.bitcoin.it/wiki/Difficulty
+    let target = get_target(hex::decode("1d00ffff").unwrap());
+    assert_eq!(
+        hex::encode(target),
+        "00000000ffff0000000000000000000000000000000000000000000000000000"
+    );
+
+    let target = get_target(hex::decode("1b0404cb").unwrap());
+    assert_eq!(
+        hex::encode(target),
+        "00000000000404cb000000000000000000000000000000000000000000000000"
+    );
 }
