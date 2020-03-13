@@ -1,15 +1,18 @@
-#![allow(non_camel_case_types)]
+mod neoscrypt {
+    #![allow(dead_code)]
+    #![allow(non_camel_case_types)]
 
-include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+    include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
-static NEOSCRYPT_OPTIONS: u32 = 0x1000;
+    static NEOSCRYPT_OPTIONS: u32 = 0x1000;
 
-pub fn rust_neoscrypt(message: Vec<u8>) -> bitcoin::util::uint::Uint256 {
-    let mut buf = [0; 32];
-    unsafe {
-        neoscrypt(message.as_ptr(), buf.as_mut_ptr(), NEOSCRYPT_OPTIONS);
+    pub fn hash(message: Vec<u8>) -> bitcoin::util::uint::Uint256 {
+        let mut buf = [0; 32];
+        unsafe {
+            neoscrypt(message.as_ptr(), buf.as_mut_ptr(), NEOSCRYPT_OPTIONS);
+        }
+        bitcoin::consensus::encode::deserialize(&buf).unwrap()
     }
-    bitcoin::consensus::encode::deserialize(&buf).unwrap()
 }
 
 fn mine(mut header: bitcoin::BlockHeader, initial_nonce: Option<u32>) -> Option<u32> {
@@ -28,7 +31,7 @@ fn mine(mut header: bitcoin::BlockHeader, initial_nonce: Option<u32>) -> Option<
 }
 
 fn check_hash(header: bitcoin::BlockHeader) -> bool {
-    rust_neoscrypt(bitcoin::consensus::encode::serialize(&header)) < header.target()
+    neoscrypt::hash(bitcoin::consensus::encode::serialize(&header)) < header.target()
 }
 
 fn main() {}
