@@ -2,10 +2,12 @@
 
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
-pub fn rust_neoscrypt(message: Vec<u8>, options: u32) -> bitcoin::util::uint::Uint256 {
+static NEOSCRYPT_OPTIONS: u32 = 0x1000;
+
+pub fn rust_neoscrypt(message: Vec<u8>) -> bitcoin::util::uint::Uint256 {
     let mut buf = [0; 32];
     unsafe {
-        neoscrypt(message.as_ptr(), buf.as_mut_ptr(), options);
+        neoscrypt(message.as_ptr(), buf.as_mut_ptr(), NEOSCRYPT_OPTIONS);
     }
     bitcoin::consensus::encode::deserialize(&buf).unwrap()
 }
@@ -26,11 +28,7 @@ fn mine(mut header: bitcoin::BlockHeader, initial_nonce: Option<u32>) -> Option<
 }
 
 fn check_hash(header: bitcoin::BlockHeader) -> bool {
-    let neo_scrypt_options: u32 = 0x1000;
-    rust_neoscrypt(
-        bitcoin::consensus::encode::serialize(&header),
-        neo_scrypt_options,
-    ) < header.target()
+    rust_neoscrypt(bitcoin::consensus::encode::serialize(&header)) < header.target()
 }
 
 fn main() {}
