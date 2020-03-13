@@ -6,12 +6,12 @@ use hex::FromHex;
 
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
-pub fn rust_neoscrypt(message: Vec<u8>, options: u32) -> [u8; 32] {
+pub fn rust_neoscrypt(message: Vec<u8>, options: u32) -> bitcoin::util::uint::Uint256 {
     let mut buf = [0; 32];
     unsafe {
         neoscrypt(message.as_ptr(), buf.as_mut_ptr(), options);
     }
-    buf
+    bitcoin::consensus::encode::deserialize(&buf).unwrap()
 }
 
 fn mine(
@@ -64,28 +64,13 @@ fn check_hash(
         nonce: nNonce,
     };
     let neo_scrypt_options: u32 = 0x1000;
-    let mut out = rust_neoscrypt(
+    rust_neoscrypt(
         bitcoin::consensus::encode::serialize(&header),
         neo_scrypt_options,
-    );
-    out.reverse();
-    check_pow(out, header.target())
+    ) < header.target()
 }
 
 fn main() {}
-
-fn check_pow(hash: [u8; 32], target: bitcoin::util::uint::Uint256) -> bool {
-    for i in 0..32 {
-        let target_byte = (target.as_bytes()[3 - (i / 8)] >> ((i % 8) * 8)) as u8;
-        if hash[i] < target_byte {
-            return true;
-        }
-        if hash[i] > target_byte {
-            return false;
-        }
-    }
-    true
-}
 
 #[cfg(test)]
 #[test]
