@@ -78,10 +78,8 @@ fn check_hash(
         idx += 1;
     }
 
-    let mut nNeoScryptOptions: u32 = 0;
-    nNeoScryptOptions |= 0x1000;
-
-    let mut out = rust_neoscrypt(header, nNeoScryptOptions);
+    let neo_scrypt_options: u32 = 0x1000;
+    let mut out = rust_neoscrypt(header, neo_scrypt_options);
     out.reverse();
 
     let target = get_target(nBits);
