@@ -2,9 +2,11 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 
+use hex::FromHex;
+
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
-pub fn rust_neoscrypt(message: [u8; 80], options: u32) -> [u8; 32] {
+pub fn rust_neoscrypt(message: Vec<u8>, options: u32) -> [u8; 32] {
     let mut buf = [0; 32];
     unsafe {
         neoscrypt(message.as_ptr(), buf.as_mut_ptr(), options);
@@ -48,38 +50,24 @@ fn check_hash(
     nBits: u32,
     nNonce: u32,
 ) -> bool {
-    let hashPrevBlock = hex::decode(hashPrevBlock).unwrap();
-    let hashMerkleRoot = hex::decode(hashMerkleRoot).unwrap();
-    let mut header = [0 as u8; 80];
-    let mut idx = 0;
+    let mut prev_block = Vec::from_hex(hashPrevBlock).unwrap();
+    prev_block.reverse();
+    let mut merkle_root = Vec::from_hex(hashMerkleRoot).unwrap();
+    merkle_root.reverse();
 
-    for byte in nVersion.to_le_bytes().iter() {
-        header[idx] = *byte;
-        idx += 1;
-    }
-    for byte in hashPrevBlock.iter().rev() {
-        header[idx] = *byte;
-        idx += 1;
-    }
-    for byte in hashMerkleRoot.iter().rev() {
-        header[idx] = *byte;
-        idx += 1;
-    }
-    for byte in nTime.to_le_bytes().iter() {
-        header[idx] = *byte;
-        idx += 1;
-    }
-    for byte in &nBits.to_le_bytes() {
-        header[idx] = *byte;
-        idx += 1;
-    }
-    for byte in nNonce.to_le_bytes().iter() {
-        header[idx] = *byte;
-        idx += 1;
-    }
-
+    let header = bitcoin::BlockHeader {
+        version: nVersion,
+        prev_blockhash: bitcoin::consensus::encode::deserialize(&prev_block).unwrap(),
+        merkle_root: bitcoin::consensus::encode::deserialize(&merkle_root).unwrap(),
+        time: nTime,
+        bits: nBits,
+        nonce: nNonce,
+    };
     let neo_scrypt_options: u32 = 0x1000;
-    let mut out = rust_neoscrypt(header, neo_scrypt_options);
+    let mut out = rust_neoscrypt(
+        bitcoin::consensus::encode::serialize(&header),
+        neo_scrypt_options,
+    );
     out.reverse();
 
     let target = get_target(nBits);
