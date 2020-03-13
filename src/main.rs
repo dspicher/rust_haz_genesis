@@ -69,29 +69,18 @@ fn check_hash(
         neo_scrypt_options,
     );
     out.reverse();
-
-    let target = get_target(nBits);
-
-    check_pow(out, target)
-}
-
-fn get_target(nBits: u32) -> [u8; 32] {
-    let b = (nBits >> 24) - 3;
-    let mut target = [0 as u8; 32];
-    target[32 - b as usize - 1] = nBits as u8;
-    target[32 - b as usize - 2] = (nBits >> 8) as u8;
-    target[32 - b as usize - 3] = (nBits >> 16) as u8;
-    target
+    check_pow(out, header.target())
 }
 
 fn main() {}
 
-fn check_pow(hash: [u8; 32], target: [u8; 32]) -> bool {
+fn check_pow(hash: [u8; 32], target: bitcoin::util::uint::Uint256) -> bool {
     for i in 0..32 {
-        if hash[i] < target[i] {
+        let target_byte = (target.as_bytes()[3 - (i / 8)] >> ((i % 8) * 8)) as u8;
+        if hash[i] < target_byte {
             return true;
         }
-        if hash[i] > target[i] {
+        if hash[i] > target_byte {
             return false;
         }
     }
@@ -146,21 +135,5 @@ fn test_mine() {
             Some(2041135619 - 10),
         ),
         Some(2041135619),
-    );
-}
-
-#[test]
-fn test_target() {
-    // from https://en.bitcoin.it/wiki/Difficulty
-    let target = get_target(0x1d00ffff);
-    assert_eq!(
-        hex::encode(target),
-        "00000000ffff0000000000000000000000000000000000000000000000000000"
-    );
-
-    let target = get_target(0x1b0404cb);
-    assert_eq!(
-        hex::encode(target),
-        "00000000000404cb000000000000000000000000000000000000000000000000"
     );
 }
