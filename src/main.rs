@@ -12,8 +12,6 @@ pub fn rust_neoscrypt(message: [u8; 80], options: u32) -> [u8; 32] {
     return buf;
 }
 
-const LOWEST_BITS: &str = "1d7fffff";
-
 fn mine(
     nVersion: u32,
     hashPrevBlock: &str,
