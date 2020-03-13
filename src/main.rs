@@ -9,7 +9,7 @@ pub fn rust_neoscrypt(message: [u8; 80], options: u32) -> [u8; 32] {
     unsafe {
         neoscrypt(message.as_ptr(), buf.as_mut_ptr(), options);
     }
-    return buf;
+    buf
 }
 
 fn mine(
