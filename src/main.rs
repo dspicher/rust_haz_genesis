@@ -1,6 +1,4 @@
-#![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
-#![allow(non_snake_case)]
 
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
@@ -12,16 +10,16 @@ pub fn rust_neoscrypt(message: Vec<u8>, options: u32) -> bitcoin::util::uint::Ui
     bitcoin::consensus::encode::deserialize(&buf).unwrap()
 }
 
-fn mine(mut header: bitcoin::BlockHeader, initialNonce: Option<u32>) -> Option<u32> {
-    let lower = match initialNonce {
+fn mine(mut header: bitcoin::BlockHeader, initial_nonce: Option<u32>) -> Option<u32> {
+    let lower = match initial_nonce {
         None => 0,
         Some(i) => i,
     };
-    for nNonce in lower..u32::max_value() {
-        println!("{:?}", nNonce);
-        header.nonce = nNonce;
+    for nonce in lower..u32::max_value() {
+        println!("{:?}", nonce);
+        header.nonce = nonce;
         if check_hash(header) {
-            return Some(nNonce);
+            return Some(nonce);
         }
     }
     None
