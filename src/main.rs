@@ -15,8 +15,11 @@ mod neoscrypt {
     }
 }
 
+use bitcoin::BitcoinHash;
 use futures::stream::StreamExt;
 use futures::task::SpawnExt;
+use hex::FromHex;
+use structopt::StructOpt;
 
 fn mine(header: bitcoin::BlockHeader, initial_nonce: Option<u32>) -> Option<u32> {
     let lower = match initial_nonce {
@@ -101,12 +104,66 @@ fn create_genesis_block(
     }
 }
 
-fn main() {}
+#[derive(StructOpt)]
+struct CliArgs {
+    #[structopt(name = "genesis msg", short = "m", long = "msg", required = true)]
+    genesis_msg: String,
+    #[structopt(name = "output script", short = "o", long = "out", required = true)]
+    out_script: String,
+    #[structopt(
+        name = "reward (in satoshi)",
+        short = "r",
+        long = "reward",
+        required = true
+    )]
+    satoshi_out: u64,
+}
+
+fn main() {
+    let args = CliArgs::from_args();
+    let script_sig = bitcoin::blockdata::script::Builder::new()
+        .push_scriptint(486604799)
+        .push_scriptint(4)
+        .push_slice(args.genesis_msg.as_bytes())
+        .into_script();
+    let out_script = bitcoin::blockdata::script::Builder::new()
+        .push_slice(&Vec::from_hex(args.out_script.clone()).unwrap())
+        .push_opcode(bitcoin::blockdata::opcodes::all::OP_CHECKSIG)
+        .into_script();
+    let time = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let block = create_genesis_block(script_sig, out_script, time as u32, 0, args.satoshi_out);
+    let nonce = mine(block.header, None).unwrap();
+    println!(
+        r#"
+static CBlock CreateGenesisBlock(uint32_t nTime, uint32_t nNonce, uint32_t nBits, int32_t nVersion, const CAmount& genesisReward)
+{{
+    const char* pszTimestamp = "{}";
+    const CScript genesisOutputScript = CScript() << ParseHex("{}") << OP_CHECKSIG;
+    return CreateGenesisBlock(pszTimestamp, genesisOutputScript, nTime, nNonce, nBits, nVersion, genesisReward);
+}}
+
+        genesis = CreateGenesisBlock({}, {}, {:#x}, 1, {});
+        consensus.hashGenesisBlock = genesis.GetHash();
+        assert(consensus.hashGenesisBlock == uint256S("0x{}"));
+        assert(genesis.hashMerkleRoot == uint256S("0x{}"));
+"#,
+        args.genesis_msg,
+        args.out_script,
+        time,
+        nonce,
+        block.header.bits,
+        args.satoshi_out,
+        block.header.bitcoin_hash(),
+        block.header.merkle_root
+    );
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hex::FromHex;
 
     fn into<T: bitcoin::consensus::encode::Decodable>(hex_string: &str) -> T {
         let mut bytes = Vec::from_hex(hex_string).unwrap();
