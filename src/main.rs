@@ -66,6 +66,41 @@ async fn check_hash(header: bitcoin::BlockHeader) -> bool {
     neoscrypt::hash(bitcoin::consensus::encode::serialize(&header)) < header.target()
 }
 
+fn create_genesis_block(
+    script_sig: bitcoin::Script,
+    out_script: bitcoin::Script,
+    time: u32,
+    nonce: u32,
+    satoshi_out: u64,
+) -> bitcoin::Block {
+    let tx = bitcoin::Transaction {
+        version: 1,
+        lock_time: 0,
+        input: vec![bitcoin::TxIn {
+            previous_output: bitcoin::OutPoint::null(),
+            script_sig,
+            sequence: bitcoin::blockdata::constants::MAX_SEQUENCE,
+            witness: vec![],
+        }],
+        output: vec![bitcoin::TxOut {
+            script_pubkey: out_script,
+            value: satoshi_out,
+        }],
+    };
+    let hash: bitcoin::hashes::sha256d::Hash = tx.txid().into();
+    bitcoin::Block {
+        header: bitcoin::BlockHeader {
+            version: 1,
+            prev_blockhash: Default::default(),
+            merkle_root: hash.into(),
+            bits: 0x1d00ffff,
+            time,
+            nonce,
+        },
+        txdata: vec![tx],
+    }
+}
+
 fn main() {}
 
 #[cfg(test)]
@@ -152,6 +187,26 @@ mod tests {
                 Some(2041135619 - 10)
             ),
             Some(2041135619)
+        );
+    }
+
+    #[test]
+    fn test_create_genesis_block() {
+        let script_sig = bitcoin::blockdata::script::Builder::new()
+            .push_scriptint(486604799)
+            .push_scriptint(4)
+            .push_slice(b"The Times 03/Jan/2009 Chancellor on brink of second bailout for banks")
+            .into_script();
+        let out_script = bitcoin::blockdata::script::Builder::new()
+            .push_slice(&Vec::from_hex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5f").unwrap())
+            .push_opcode(bitcoin::blockdata::opcodes::all::OP_CHECKSIG)
+            .into_script();
+        let sats = 50 * bitcoin::blockdata::constants::COIN_VALUE;
+        assert_eq!(
+            create_genesis_block(script_sig, out_script, 1231006505, 2083236893, sats),
+            bitcoin::blockdata::constants::genesis_block(
+                bitcoin::network::constants::Network::Bitcoin
+            )
         );
     }
 }
