@@ -18,7 +18,6 @@ mod neoscrypt {
 use bitcoin::BitcoinHash;
 use futures::stream::StreamExt;
 use futures::task::SpawnExt;
-use hex::FromHex;
 use structopt::StructOpt;
 
 fn mine(header: bitcoin::BlockHeader, initial_nonce: u32) -> Option<u32> {
@@ -108,8 +107,14 @@ fn parse_hex(src: &str) -> Result<u32, std::num::ParseIntError> {
 struct CliArgs {
     #[structopt(name = "genesis msg", short = "m", long = "msg", required = true)]
     genesis_msg: String,
-    #[structopt(name = "output script", short = "o", long = "out", required = true)]
-    out_script: String,
+    #[structopt(
+        name = "wif prefix",
+        short = "w",
+        long = "wif-prefix",
+        required = true,
+        default_value = "128"
+    )]
+    wif_prefix: u8,
     #[structopt(
         name = "reward (in satoshi)",
         short = "r",
@@ -134,8 +139,12 @@ fn main() {
         .push_scriptint(4)
         .push_slice(args.genesis_msg.as_bytes())
         .into_script();
+
+    let mut rng = rand::rngs::OsRng::new().unwrap();
+    let (sk, pk) = secp256k1::Secp256k1::new().generate_keypair(&mut rng);
+
     let out_script = bitcoin::blockdata::script::Builder::new()
-        .push_slice(&Vec::from_hex(args.out_script.clone()).unwrap())
+        .push_slice(&pk.serialize())
         .push_opcode(bitcoin::blockdata::opcodes::all::OP_CHECKSIG)
         .into_script();
     let time = std::time::SystemTime::now()
@@ -166,7 +175,7 @@ static CBlock CreateGenesisBlock(uint32_t nTime, uint32_t nNonce, uint32_t nBits
         assert(genesis.hashMerkleRoot == uint256S("0x{}"));
 "#,
         args.genesis_msg,
-        args.out_script,
+        hex::encode(pk.serialize()[..].to_vec()),
         time,
         block.header.nonce,
         block.header.bits,
@@ -174,11 +183,19 @@ static CBlock CreateGenesisBlock(uint32_t nTime, uint32_t nNonce, uint32_t nBits
         block.header.bitcoin_hash(),
         block.header.merkle_root
     );
+    let mut wif_key = sk[..].to_vec();
+    wif_key.insert(0, args.wif_prefix);
+    wif_key.push(1);
+    println!(
+        "WIF key: {}",
+        bitcoin::util::base58::check_encode_slice(&wif_key)
+    );
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use hex::FromHex;
 
     fn into<T: bitcoin::consensus::encode::Decodable>(hex_string: &str) -> T {
         let mut bytes = Vec::from_hex(hex_string).unwrap();
