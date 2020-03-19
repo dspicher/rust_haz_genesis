@@ -142,7 +142,7 @@ fn main() {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_secs();
-    let block = create_genesis_block(
+    let mut block = create_genesis_block(
         script_sig,
         out_script,
         time as u32,
@@ -150,7 +150,7 @@ fn main() {
         args.bits,
         args.satoshi_out,
     );
-    let nonce = mine(block.header, 0).unwrap();
+    block.header.nonce = mine(block.header, 0).unwrap();
     println!(
         r#"
 static CBlock CreateGenesisBlock(uint32_t nTime, uint32_t nNonce, uint32_t nBits, int32_t nVersion, const CAmount& genesisReward)
@@ -168,7 +168,7 @@ static CBlock CreateGenesisBlock(uint32_t nTime, uint32_t nNonce, uint32_t nBits
         args.genesis_msg,
         args.out_script,
         time,
-        nonce,
+        block.header.nonce,
         block.header.bits,
         args.satoshi_out,
         block.header.bitcoin_hash(),
