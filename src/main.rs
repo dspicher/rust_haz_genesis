@@ -74,6 +74,7 @@ fn create_genesis_block(
     out_script: bitcoin::Script,
     time: u32,
     nonce: u32,
+    bits: u32,
     satoshi_out: u64,
 ) -> bitcoin::Block {
     let tx = bitcoin::Transaction {
@@ -96,12 +97,16 @@ fn create_genesis_block(
             version: 1,
             prev_blockhash: Default::default(),
             merkle_root: hash.into(),
-            bits: 0x1d00ffff,
+            bits,
             time,
             nonce,
         },
         txdata: vec![tx],
     }
+}
+
+fn parse_hex(src: &str) -> Result<u32, std::num::ParseIntError> {
+    u32::from_str_radix(src.trim_start_matches("0x"), 16)
 }
 
 #[derive(StructOpt)]
@@ -117,6 +122,14 @@ struct CliArgs {
         required = true
     )]
     satoshi_out: u64,
+    #[structopt(
+        name = "difficulty bits (hex)",
+        short = "b",
+        long = "bits",
+        parse(try_from_str = parse_hex),
+        default_value = "0x1d7fffff"
+    )]
+    bits: u32,
 }
 
 fn main() {
@@ -134,7 +147,14 @@ fn main() {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_secs();
-    let block = create_genesis_block(script_sig, out_script, time as u32, 0, args.satoshi_out);
+    let block = create_genesis_block(
+        script_sig,
+        out_script,
+        time as u32,
+        0,
+        args.bits,
+        args.satoshi_out,
+    );
     let nonce = mine(block.header, None).unwrap();
     println!(
         r#"
@@ -260,7 +280,7 @@ mod tests {
             .into_script();
         let sats = 50 * bitcoin::blockdata::constants::COIN_VALUE;
         assert_eq!(
-            create_genesis_block(script_sig, out_script, 1231006505, 2083236893, sats),
+            create_genesis_block(script_sig, out_script, 1231006505, 2083236893, 0x1d00ffff, sats),
             bitcoin::blockdata::constants::genesis_block(
                 bitcoin::network::constants::Network::Bitcoin
             )
