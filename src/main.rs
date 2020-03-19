@@ -21,16 +21,11 @@ use futures::task::SpawnExt;
 use hex::FromHex;
 use structopt::StructOpt;
 
-fn mine(header: bitcoin::BlockHeader, initial_nonce: Option<u32>) -> Option<u32> {
-    let lower = match initial_nonce {
-        None => 0,
-        Some(i) => i,
-    };
-
+fn mine(header: bitcoin::BlockHeader, initial_nonce: u32) -> Option<u32> {
     let executor = futures::executor::ThreadPool::new().unwrap();
     let jobs = 10000;
 
-    let nonces = lower..u32::max_value();
+    let nonces = initial_nonce..u32::max_value();
     let mut results = nonces
         .clone()
         .take(jobs)
@@ -155,7 +150,7 @@ fn main() {
         args.bits,
         args.satoshi_out,
     );
-    let nonce = mine(block.header, None).unwrap();
+    let nonce = mine(block.header, 0).unwrap();
     println!(
         r#"
 static CBlock CreateGenesisBlock(uint32_t nTime, uint32_t nNonce, uint32_t nBits, int32_t nVersion, const CAmount& genesisReward)
@@ -242,7 +237,7 @@ mod tests {
                     bits: 0x1d01cc13,
                     nonce: 0,
                 },
-                Some(867267585 - 10),
+                867267585 - 10,
             ),
             Some(867267585),
         );
@@ -261,7 +256,7 @@ mod tests {
                     bits: 0x1d023fa9,
                     nonce: 0,
                 },
-                Some(2041135619 - 10)
+                2041135619 - 10
             ),
             Some(2041135619)
         );
